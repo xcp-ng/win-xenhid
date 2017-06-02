@@ -61,6 +61,8 @@ FdoGetSize(
     return sizeof(XENHID_FDO);
 }
 
+IO_CSQ_INSERT_IRP FdoCsqInsertIrp;
+
 VOID
 FdoCsqInsertIrp(
     IN  PIO_CSQ Csq,
@@ -72,6 +74,8 @@ FdoCsqInsertIrp(
     InsertTailList(&Fdo->List, &Irp->Tail.Overlay.ListEntry);
 }
 
+IO_CSQ_REMOVE_IRP FdoCsqRemoveIrp;
+
 VOID
 FdoCsqRemoveIrp(
     IN  PIO_CSQ Csq,
@@ -82,6 +86,8 @@ FdoCsqRemoveIrp(
 
     RemoveEntryList(&Irp->Tail.Overlay.ListEntry);
 }
+
+IO_CSQ_PEEK_NEXT_IRP FdoCsqPeekNextIrp;
 
 PIRP
 FdoCsqPeekNextIrp(
@@ -106,6 +112,11 @@ FdoCsqPeekNextIrp(
     return NextIrp;
 }
 
+#pragma warning(push)
+#pragma warning(disable:28167) // function changes IRQL
+
+IO_CSQ_ACQUIRE_LOCK FdoCsqAcquireLock;
+
 VOID
 FdoCsqAcquireLock(
     IN  PIO_CSQ Csq,
@@ -117,6 +128,8 @@ FdoCsqAcquireLock(
     KeAcquireSpinLock(&Fdo->Lock, Irql);
 }
 
+IO_CSQ_RELEASE_LOCK FdoCsqReleaseLock;
+
 VOID
 FdoCsqReleaseLock(
     IN  PIO_CSQ Csq,
@@ -125,9 +138,12 @@ FdoCsqReleaseLock(
 {
     PXENHID_FDO Fdo = CONTAINING_RECORD(Csq, XENHID_FDO, Queue);
 
-#pragma warning(suppress:26110)
     KeReleaseSpinLock(&Fdo->Lock, Irql);
 }
+
+#pragma warning(pop)
+
+IO_CSQ_COMPLETE_CANCELED_IRP FdoCsqCompleteCanceledIrp;
 
 VOID
 FdoCsqCompleteCanceledIrp(
@@ -605,6 +621,7 @@ FdoQueryHidInterface(
     KeInitializeEvent(&Event, NotificationEvent, FALSE);
     RtlZeroMemory(&StatusBlock, sizeof(IO_STATUS_BLOCK));
 
+#pragma prefast(suppress:28123)
     Irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP,
                                        Fdo->LowerDeviceObject,
                                        NULL,
