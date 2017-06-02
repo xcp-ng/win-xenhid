@@ -246,38 +246,6 @@ def remove_timestamps(path):
     dst.close()
     src.close()
 
-def run_sdv(name, dir, vs):
-    release = { 'vs2012':'Windows 8',
-                'vs2013':'Windows 8',
-                'vs2015':'Windows 10' }
-
-    configuration = get_configuration(release[vs], False)
-    platform = 'x64'
-
-    msbuild(platform, configuration, 'Build', name + '.vcxproj',
-            '', os.path.join(vs, name))
-
-    msbuild(platform, configuration, 'sdv', name + '.vcxproj',
-            '/p:Inputs="/clean"', os.path.join(vs, name))
-
-    msbuild(platform, configuration, 'sdv', name + '.vcxproj',
-            '/p:Inputs="/check:default.sdv"', os.path.join(vs, name))
-
-    path = [vs, name, 'sdv', 'SDV.DVL.xml']
-    remove_timestamps(os.path.join(*path))
-
-    msbuild(platform, configuration, 'dvl', name + '.vcxproj',
-            '', os.path.join(vs, name))
-
-    path = [vs, name, name + '.DVL.XML']
-    shutil.copy(os.path.join(*path), dir)
-
-    path = [vs, name, 'refine.sdv']
-    if os.path.isfile(os.path.join(*path)):
-        msbuild(platform, configuration, 'sdv', name + '.vcxproj',
-                '/p:Inputs=/refine', os.path.join(vs, name))
-
-
 def symstore_del(name, age):
     symstore_path = [os.environ['KIT'], 'Debuggers']
     if os.environ['PROCESSOR_ARCHITECTURE'] == 'x86':
@@ -377,7 +345,6 @@ def getVsVersion():
 
 if __name__ == '__main__':
     debug = { 'checked': True, 'free': False }
-    sdv = { 'nosdv': False, None: True }
     driver = 'xenhid'
     vs = getVsVersion()
 
@@ -430,9 +397,6 @@ if __name__ == '__main__':
 
     symstore_add(driver, release[vs], 'x86', debug[sys.argv[1]], vs)
     symstore_add(driver, release[vs], 'x64', debug[sys.argv[1]], vs)
-
-    if len(sys.argv) <= 2 or sdv[sys.argv[2]]:
-        run_sdv('xenhid', driver, vs)
 
     archive(driver + '\\source.tgz', manifest().splitlines(), tgz=True)
     archive(driver + '.tar', [driver,'revision'])
