@@ -53,4 +53,13 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <ItemGroup>
+    <PackageFiles Include="$(OutDir)\$(ProjectName)\*" />
+  </ItemGroup>
+  <Target Name="Archive" AfterTargets="TestSign">
+    <Copy
+	SourceFiles="@(PackageFiles)"
+	DestinationFiles="@(PackageFiles->'$(ArchiveDir)\%(FileName)%(Extension)')"
+    />
+  </Target>
 </Project>
