@@ -677,7 +677,7 @@ fail1:
     return FALSE;
 }
 
-#define DEFINE_REVISION(_N, _H) \
+#define DEFINE_REVISION(_N, _H, _ST, _SU) \
     (_N)
 
 static DWORD    DeviceRevision[] = {

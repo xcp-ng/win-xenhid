@@ -34,24 +34,35 @@
 #include <procgrp.h>
 #include <ntstrsafe.h>
 #include <hidport.h>
+#include <version.h>
 
 #include <hid_interface.h>
+#include <store_interface.h>
+#include <suspend_interface.h>
 
 #include "fdo.h"
 #include "driver.h"
 #include "dbg_print.h"
 #include "assert.h"
 #include "util.h"
+#include "string.h"
+
+#define MAXNAMELEN  128
 
 struct _XENHID_FDO {
-    PDEVICE_OBJECT          DeviceObject;
-    PDEVICE_OBJECT          LowerDeviceObject;
-    BOOLEAN                 Enabled;
-    XENHID_HID_INTERFACE    HidInterface;
-    IO_CSQ                  Queue;
-    KSPIN_LOCK              Lock;
-    LIST_ENTRY              List;
+    PDEVICE_OBJECT              DeviceObject;
+    PDEVICE_OBJECT              LowerDeviceObject;
+    BOOLEAN                     Enabled;
+    XENHID_HID_INTERFACE        HidInterface;
+    XENBUS_STORE_INTERFACE      StoreInterface;
+    XENBUS_SUSPEND_INTERFACE    SuspendInterface;
+    PXENBUS_SUSPEND_CALLBACK    SuspendCallback;
+    IO_CSQ                      Queue;
+    KSPIN_LOCK                  Lock;
+    LIST_ENTRY                  List;
 };
+
+#define FDO_POOL_TAG 'ODF'
 
 ULONG
 FdoGetSize(
@@ -186,6 +197,390 @@ done:
     return Completed;
 }
 
+
+static FORCEINLINE PVOID
+__FdoAllocate(
+    IN  ULONG   Length
+    )
+{
+    PVOID       Buffer;
+
+    Buffer = ExAllocatePoolWithTag(NonPagedPool, Length, FDO_POOL_TAG);
+    if (Buffer)
+        RtlZeroMemory(Buffer, Length);
+
+    return Buffer;
+}
+
+static FORCEINLINE VOID
+__FdoFree(
+    IN  PVOID   Buffer
+    )
+{
+    ExFreePoolWithTag(Buffer, FDO_POOL_TAG);
+}
+
+static FORCEINLINE PANSI_STRING
+__FdoMultiSzToUpcaseAnsi(
+    IN  PCHAR       Buffer
+)
+{
+    PANSI_STRING    Ansi;
+    LONG            Index;
+    LONG            Count;
+    NTSTATUS        status;
+
+    Index = 0;
+    Count = 0;
+    for (;;) {
+        if (Buffer[Index] == '\0') {
+            Count++;
+            Index++;
+
+            // Check for double NUL
+            if (Buffer[Index] == '\0')
+                break;
+        }
+        else {
+            Buffer[Index] = __toupper(Buffer[Index]);
+            Index++;
+        }
+    }
+
+    Ansi = __FdoAllocate(sizeof(ANSI_STRING) * (Count + 1));
+
+    status = STATUS_NO_MEMORY;
+    if (Ansi == NULL)
+        goto fail1;
+
+    for (Index = 0; Index < Count; Index++) {
+        ULONG   Length;
+
+        Length = (ULONG)strlen(Buffer);
+        Ansi[Index].MaximumLength = (USHORT)(Length + 1);
+        Ansi[Index].Buffer = __FdoAllocate(Ansi[Index].MaximumLength);
+
+        status = STATUS_NO_MEMORY;
+        if (Ansi[Index].Buffer == NULL)
+            goto fail2;
+
+        RtlCopyMemory(Ansi[Index].Buffer, Buffer, Length);
+        Ansi[Index].Length = (USHORT)Length;
+
+        Buffer += Length + 1;
+    }
+
+    return Ansi;
+
+fail2:
+    Error("fail2\n");
+
+    while (--Index >= 0)
+        __FdoFree(Ansi[Index].Buffer);
+
+    __FdoFree(Ansi);
+
+fail1:
+    Error("fail1 (%08x)\n", status);
+
+    return NULL;
+}
+
+static FORCEINLINE VOID
+__FdoFreeAnsi(
+    IN  PANSI_STRING    Ansi
+    )
+{
+    ULONG               Index;
+
+    for (Index = 0; Ansi[Index].Buffer != NULL; Index++)
+        __FdoFree(Ansi[Index].Buffer);
+
+    __FdoFree(Ansi);
+}
+
+static FORCEINLINE BOOLEAN
+__FdoMatchDistribution(
+    IN  PXENHID_FDO     Fdo,
+    IN  PCHAR           Buffer
+)
+{
+    PCHAR               Vendor;
+    PCHAR               Product;
+    PCHAR               Context;
+    const CHAR          *Text;
+    BOOLEAN             Match;
+    ULONG               Index;
+    NTSTATUS            status;
+
+    UNREFERENCED_PARAMETER(Fdo);
+
+    status = STATUS_INVALID_PARAMETER;
+
+    Vendor = __strtok_r(Buffer, " ", &Context);
+    if (Vendor == NULL)
+        goto fail1;
+
+    Product = __strtok_r(NULL, " ", &Context);
+    if (Product == NULL)
+        goto fail2;
+
+    Match = TRUE;
+
+    Text = VENDOR_NAME_STR;
+
+    for (Index = 0; Text[Index] != 0; Index++) {
+        if (!isalnum((UCHAR)Text[Index])) {
+            if (Vendor[Index] != '_') {
+                Match = FALSE;
+                break;
+            }
+        } else {
+            if (Vendor[Index] != Text[Index]) {
+                Match = FALSE;
+                break;
+            }
+        }
+    }
+
+    Text = "XENHID";
+
+    if (_stricmp(Product, Text) != 0)
+        Match = FALSE;
+
+    return Match;
+
+fail2:
+    Error("fail2\n");
+
+fail1:
+    Error("fail1 (%08x)\n", status);
+
+    return FALSE;
+}
+
+#define MAXIMUM_INDEX   255
+
+static FORCEINLINE NTSTATUS
+__FdoSetDistribution(
+    IN  PXENHID_FDO     Fdo
+    )
+{
+    ULONG               Index;
+    CHAR                Distribution[MAXNAMELEN];
+    CHAR                Vendor[MAXNAMELEN];
+    STRING              String;
+    const CHAR          *Product;
+    NTSTATUS            status;
+
+    Trace("====>\n");
+
+    Index = 0;
+    while (Index <= MAXIMUM_INDEX) {
+        PCHAR   Buffer;
+
+        String.Buffer = Distribution;
+        String.MaximumLength = sizeof(Distribution);
+        String.Length = 0;
+
+        status = StringPrintf(&String,
+                              "%u",
+                              Index);
+        ASSERT(NT_SUCCESS(status));
+
+        status = XENBUS_STORE(Read,
+                              &Fdo->StoreInterface,
+                              NULL,
+                              "drivers",
+                              Distribution,
+                              &Buffer);
+        if (!NT_SUCCESS(status)) {
+            if (status == STATUS_OBJECT_NAME_NOT_FOUND)
+                goto update;
+
+            goto fail1;
+        }
+
+        XENBUS_STORE(Free,
+            &Fdo->StoreInterface,
+            Buffer);
+
+        Index++;
+    }
+
+    status = STATUS_UNSUCCESSFUL;
+    goto fail2;
+
+update:
+    String.Buffer = Vendor;
+    String.MaximumLength = sizeof(Vendor);
+    String.Length = 0;
+
+    status = StringPrintf(&String,
+                          "%s",
+                          VENDOR_NAME_STR);
+    ASSERT(NT_SUCCESS(status));
+
+    for (Index = 0; Vendor[Index] != '\0'; Index++)
+        if (!isalnum((UCHAR)Vendor[Index]))
+            Vendor[Index] = '_';
+
+    Product = "XENHID";
+
+#if DBG
+#define ATTRIBUTES   "(DEBUG)"
+#else
+#define ATTRIBUTES   ""
+#endif
+
+    (VOID)XENBUS_STORE(Printf,
+                       &Fdo->StoreInterface,
+                       NULL,
+                       "drivers",
+                       Distribution,
+                       "%s %s %u.%u.%u.%u %s",
+                       Vendor,
+                       Product,
+                       MAJOR_VERSION,
+                       MINOR_VERSION,
+                       MICRO_VERSION,
+                       BUILD_NUMBER,
+                       ATTRIBUTES
+    );
+
+#undef  ATTRIBUTES
+
+    Trace("<====\n");
+    return STATUS_SUCCESS;
+
+fail2:
+    Error("fail2\n");
+
+fail1:
+    Error("fail1 (%08x)\n", status);
+
+    return status;
+}
+
+static FORCEINLINE VOID
+__FdoClearDistribution(
+    IN  PXENHID_FDO     Fdo
+    )
+{
+    PCHAR               Buffer;
+    PANSI_STRING        Distributions;
+    ULONG               Index;
+    NTSTATUS            status;
+
+    Trace("====>\n");
+
+    status = XENBUS_STORE(Directory,
+                          &Fdo->StoreInterface,
+                          NULL,
+                          NULL,
+                          "drivers",
+                          &Buffer);
+    if (NT_SUCCESS(status)) {
+        Distributions = __FdoMultiSzToUpcaseAnsi(Buffer);
+
+        XENBUS_STORE(Free,
+                     &Fdo->StoreInterface,
+                     Buffer);
+    } else {
+        Distributions = NULL;
+    }
+
+    if (Distributions == NULL)
+        goto done;
+
+    for (Index = 0; Distributions[Index].Buffer != NULL; Index++) {
+        PANSI_STRING    Distribution = &Distributions[Index];
+
+        status = XENBUS_STORE(Read,
+                              &Fdo->StoreInterface,
+                              NULL,
+                              "drivers",
+                              Distribution->Buffer,
+                              &Buffer);
+        if (!NT_SUCCESS(status))
+            continue;
+
+        if (__FdoMatchDistribution(Fdo, Buffer))
+            (VOID)XENBUS_STORE(Remove,
+                               &Fdo->StoreInterface,
+                               NULL,
+                               "drivers",
+                               Distribution->Buffer);
+
+        XENBUS_STORE(Free,
+                     &Fdo->StoreInterface,
+                     Buffer);
+    }
+
+    __FdoFreeAnsi(Distributions);
+
+done:
+    Trace("<====\n");
+}
+
+static DECLSPEC_NOINLINE VOID
+FdoSuspendCallback(
+    IN  PVOID       Argument
+    )
+{
+    PXENHID_FDO     Fdo = Argument;
+
+    (VOID)__FdoSetDistribution(Fdo);
+}
+
+static DECLSPEC_NOINLINE NTSTATUS
+FdoSetDistribution(
+    IN  PXENHID_FDO Fdo
+    )
+{
+    NTSTATUS            status;
+
+    Trace("====>\n");
+
+    (VOID)__FdoSetDistribution(Fdo);
+
+    status = XENBUS_SUSPEND(Register,
+                            &Fdo->SuspendInterface,
+                            SUSPEND_CALLBACK_LATE,
+                            FdoSuspendCallback,
+                            Fdo,
+                            &Fdo->SuspendCallback);
+    if (!NT_SUCCESS(status))
+        goto fail1;
+
+    Trace("<====\n");
+    return STATUS_SUCCESS;
+
+fail1:
+    Error("fail1 (%08x)\n", status);
+
+    __FdoClearDistribution(Fdo);
+
+    return status;
+}
+
+static DECLSPEC_NOINLINE VOID
+FdoClearDistribution(
+    IN  PXENHID_FDO Fdo
+    )
+{
+    Trace("====>\n");
+
+    XENBUS_SUSPEND(Deregister,
+                   &Fdo->SuspendInterface,
+                   Fdo->SuspendCallback);
+    Fdo->SuspendCallback = NULL;
+
+    __FdoClearDistribution(Fdo);
+
+    Trace("<====\n");
+}
+
 static DECLSPEC_NOINLINE NTSTATUS
 FdoD3ToD0(
     IN  PXENHID_FDO Fdo
@@ -198,28 +593,59 @@ FdoD3ToD0(
     if (Fdo->Enabled)
         goto done;
 
+    status = XENBUS_STORE(Acquire,
+                          &Fdo->StoreInterface);
+    if (!NT_SUCCESS(status))
+        goto fail1;
+
+    status = XENBUS_SUSPEND(Acquire,
+                            &Fdo->SuspendInterface);
+    if (!NT_SUCCESS(status))
+        goto fail2;
+
+    status = FdoSetDistribution(Fdo);
+    if (!NT_SUCCESS(status))
+        goto fail3;
+
     status = XENHID_HID(Acquire,
                         &Fdo->HidInterface);
     if (!NT_SUCCESS(status))
-        goto fail1;
+        goto fail4;
 
     status = XENHID_HID(Enable,
                         &Fdo->HidInterface,
                         FdoHidCallback,
                         Fdo);
     if (!NT_SUCCESS(status))
-        goto fail2;
+        goto fail5;
 
     Fdo->Enabled = TRUE;
 done:
     Trace("<=====\n");
     return STATUS_SUCCESS;
 
-fail2:
-    Error("fail2\n");
+fail5:
+    Error("fail5\n");
 
     XENHID_HID(Release,
                &Fdo->HidInterface);
+
+fail4:
+    Error("fail4\n");
+
+    FdoClearDistribution(Fdo);
+
+fail3:
+    Error("fail3\n");
+
+    XENBUS_SUSPEND(Release,
+                   &Fdo->SuspendInterface);
+
+fail2:
+    Error("fail2\n");
+
+    XENBUS_STORE(Release,
+                 &Fdo->StoreInterface);
 
 fail1:
     Error("fail1 %08x\n", status);
@@ -241,6 +667,14 @@ FdoD0ToD3(
 
     XENHID_HID(Release,
                &Fdo->HidInterface);
+
+    FdoClearDistribution(Fdo);
+
+    XENBUS_SUSPEND(Release,
+                   &Fdo->SuspendInterface);
+
+    XENBUS_STORE(Release,
+                 &Fdo->StoreInterface);
 
     Fdo->Enabled = FALSE;
 done:
@@ -606,8 +1040,12 @@ FdoDispatch(
 }
 
 static FORCEINLINE NTSTATUS
-FdoQueryHidInterface(
-    IN  PXENHID_FDO     Fdo
+FdoQueryInterface(
+    IN  PXENHID_FDO     Fdo,
+    IN  const GUID      *Guid,
+    IN  ULONG           Version,
+    OUT PINTERFACE      Interface,
+    IN  ULONG           Size
     )
 {
     KEVENT              Event;
@@ -637,10 +1075,10 @@ FdoQueryHidInterface(
     StackLocation = IoGetNextIrpStackLocation(Irp);
     StackLocation->MinorFunction = IRP_MN_QUERY_INTERFACE;
 
-    StackLocation->Parameters.QueryInterface.InterfaceType = &GUID_XENHID_HID_INTERFACE;
-    StackLocation->Parameters.QueryInterface.Size = sizeof (XENHID_HID_INTERFACE);
-    StackLocation->Parameters.QueryInterface.Version = XENHID_HID_INTERFACE_VERSION_MAX;
-    StackLocation->Parameters.QueryInterface.Interface = (PINTERFACE)&Fdo->HidInterface;
+    StackLocation->Parameters.QueryInterface.InterfaceType = Guid;
+    StackLocation->Parameters.QueryInterface.Size = (USHORT)Size;
+    StackLocation->Parameters.QueryInterface.Version = (USHORT)Version;
+    StackLocation->Parameters.QueryInterface.Interface = Interface;
 
     Irp->IoStatus.Status = STATUS_NOT_SUPPORTED;
 
@@ -694,12 +1132,44 @@ FdoCreate(
     if (!NT_SUCCESS(status))
         goto fail1;
 
-    status = FdoQueryHidInterface(Fdo);
+    status = FdoQueryInterface(Fdo,
+                               &GUID_XENBUS_SUSPEND_INTERFACE,
+                               XENBUS_SUSPEND_INTERFACE_VERSION_MAX,
+                               (PINTERFACE)&Fdo->SuspendInterface,
+                               sizeof(XENBUS_SUSPEND_INTERFACE));
     if (!NT_SUCCESS(status))
         goto fail2;
 
+    status = FdoQueryInterface(Fdo,
+                               &GUID_XENBUS_STORE_INTERFACE,
+                               XENBUS_STORE_INTERFACE_VERSION_MAX,
+                               (PINTERFACE)&Fdo->StoreInterface,
+                               sizeof(XENBUS_STORE_INTERFACE));
+    if (!NT_SUCCESS(status))
+        goto fail3;
+
+    status = FdoQueryInterface(Fdo,
+                               &GUID_XENHID_HID_INTERFACE,
+                               XENHID_HID_INTERFACE_VERSION_MAX,
+                               (PINTERFACE)&Fdo->HidInterface,
+                               sizeof(XENHID_HID_INTERFACE));
+    if (!NT_SUCCESS(status))
+        goto fail4;
+
     Trace("<=====\n");
     return STATUS_SUCCESS;
+
+fail4:
+    Error("fail4\n");
+
+    RtlZeroMemory(&Fdo->StoreInterface,
+                  sizeof(XENBUS_STORE_INTERFACE));
+
+fail3:
+    Error("fail3\n");
+
+    RtlZeroMemory(&Fdo->SuspendInterface,
+                  sizeof(XENBUS_SUSPEND_INTERFACE));
 
 fail2:
     Error("fail2\n");
@@ -728,6 +1198,10 @@ FdoDestroy(
 
     RtlZeroMemory(&Fdo->HidInterface,
                   sizeof(XENHID_HID_INTERFACE));
+    RtlZeroMemory(&Fdo->SuspendInterface,
+                  sizeof(XENBUS_SUSPEND_INTERFACE));
+    RtlZeroMemory(&Fdo->StoreInterface,
+                  sizeof(XENBUS_STORE_INTERFACE));
     RtlZeroMemory(&Fdo->Queue, sizeof(IO_CSQ));
     RtlZeroMemory(&Fdo->List, sizeof(LIST_ENTRY));
     RtlZeroMemory(&Fdo->Lock, sizeof(KSPIN_LOCK));

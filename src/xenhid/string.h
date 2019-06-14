@@ -29,18 +29,23 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _REVISION_H
-#define _REVISION_H
+#ifndef _XENHID_STRING_H
+#define _XENHID_STRING_H
 
-// Key:
-// H  - XENHID_HID_INTERFACE
-// ST - XENBUS_STORE_INTERFACE
-// SU - XENBUS_SUSPEND_INTERFACE
+#include <ntddk.h>
 
-//                    REVISION   H  ST SU
-#define DEFINE_REVISION_TABLE               \
-    DEFINE_REVISION(0x09000000,  1, 0, 0),  \
-    DEFINE_REVISION(0x09000001,  1, 1, 1),  \
-    DEFINE_REVISION(0x09000002,  1, 2, 1)
+extern NTSTATUS
+StringVPrintf(
+    IN  PSTRING     String,
+    IN  const CHAR  *Format,
+    IN  va_list     Arguments
+    );
 
-#endif  // _REVISION_H
+extern NTSTATUS
+StringPrintf(
+    IN  PSTRING     String,
+    IN  const CHAR  *Format,
+    ...
+    );
+
+#endif  // _XENHID_STRING_H
