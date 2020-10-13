@@ -41,10 +41,12 @@
 #include <suspend_interface.h>
 
 #include "fdo.h"
+#include "thread.h"
 #include "driver.h"
 #include "dbg_print.h"
 #include "assert.h"
 #include "util.h"
+#include "names.h"
 #include "string.h"
 
 #define MAXNAMELEN  128
@@ -52,6 +54,9 @@
 struct _XENHID_FDO {
     PDEVICE_OBJECT              DeviceObject;
     PDEVICE_OBJECT              LowerDeviceObject;
+    PXENHID_THREAD              DevicePowerThread;
+    PIRP                        DevicePowerIrp;
+    DEVICE_POWER_STATE          DevicePowerState;
     BOOLEAN                     Enabled;
     XENHID_HID_INTERFACE        HidInterface;
     XENBUS_STORE_INTERFACE      StoreInterface;
@@ -218,6 +223,23 @@ __FdoFree(
     )
 {
     ExFreePoolWithTag(Buffer, FDO_POOL_TAG);
+}
+
+static FORCEINLINE VOID
+__FdoSetDevicePowerState(
+    IN  PXENHID_FDO         Fdo,
+    IN  DEVICE_POWER_STATE  State
+)
+{
+    Fdo->DevicePowerState = State;
+}
+
+static FORCEINLINE DEVICE_POWER_STATE
+__FdoGetDevicePowerState(
+    IN  PXENHID_FDO     Fdo
+)
+{
+    return Fdo->DevicePowerState;
 }
 
 static FORCEINLINE PANSI_STRING
@@ -588,6 +610,8 @@ FdoD3ToD0(
 {
     NTSTATUS        status;
 
+    ASSERT3U(__FdoGetDevicePowerState(Fdo), ==, PowerDeviceD3);
+
     Trace("=====>\n");
 
     if (Fdo->Enabled)
@@ -621,6 +645,7 @@ FdoD3ToD0(
 
     Fdo->Enabled = TRUE;
 done:
+    __FdoSetDevicePowerState(Fdo, PowerDeviceD0);
     Trace("<=====\n");
     return STATUS_SUCCESS;
 
@@ -658,6 +683,8 @@ FdoD0ToD3(
     )
 {
     Trace("=====>\n");
+
+    __FdoSetDevicePowerState(Fdo, PowerDeviceD3);
 
     if (!Fdo->Enabled)
         goto done;
@@ -868,6 +895,222 @@ FdoDispatchPnp(
     return status;
 }
 
+static FORCEINLINE NTSTATUS
+__FdoSetDevicePowerUp(
+    IN  PXENHID_FDO     Fdo,
+    IN  PIRP            Irp
+)
+{
+    PIO_STACK_LOCATION  StackLocation;
+    DEVICE_POWER_STATE  DeviceState;
+    NTSTATUS            status;
+
+    Trace("====>\n");
+
+    StackLocation = IoGetCurrentIrpStackLocation(Irp);
+    DeviceState = StackLocation->Parameters.Power.State.DeviceState;
+
+    ASSERT3U(DeviceState, <, __FdoGetDevicePowerState(Fdo));
+
+    status = FdoForwardIrpSynchronously(Fdo, Irp);
+    if (!NT_SUCCESS(status))
+        goto done;
+
+    Info("%s -> %s\n",
+        PowerDeviceStateName(__FdoGetDevicePowerState(Fdo)),
+        PowerDeviceStateName(DeviceState));
+
+    ASSERT3U(DeviceState, ==, PowerDeviceD0);
+    status = FdoD3ToD0(Fdo);
+    ASSERT(NT_SUCCESS(status));
+
+done:
+    Irp->IoStatus.Status = status;
+    IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+    Trace("<==== (%08x)\n", status);
+    return status;
+}
+
+static FORCEINLINE NTSTATUS
+__FdoSetDevicePowerDown(
+    IN  PXENHID_FDO     Fdo,
+    IN  PIRP            Irp
+)
+{
+    PIO_STACK_LOCATION  StackLocation;
+    DEVICE_POWER_STATE  DeviceState;
+    NTSTATUS            status;
+
+    StackLocation = IoGetCurrentIrpStackLocation(Irp);
+    DeviceState = StackLocation->Parameters.Power.State.DeviceState;
+
+    ASSERT3U(DeviceState, >, __FdoGetDevicePowerState(Fdo));
+
+    Info("%s -> %s\n",
+        PowerDeviceStateName(__FdoGetDevicePowerState(Fdo)),
+        PowerDeviceStateName(DeviceState));
+
+    ASSERT3U(DeviceState, ==, PowerDeviceD3);
+
+    if (__FdoGetDevicePowerState(Fdo) == PowerDeviceD0)
+        FdoD0ToD3(Fdo);
+
+    IoSkipCurrentIrpStackLocation(Irp);
+    status = IoCallDriver(Fdo->LowerDeviceObject, Irp);
+
+    return status;
+}
+
+static FORCEINLINE NTSTATUS
+__FdoSetDevicePower(
+    IN  PXENHID_FDO     Fdo,
+    IN  PIRP            Irp
+)
+{
+    PIO_STACK_LOCATION  StackLocation;
+    DEVICE_POWER_STATE  DeviceState;
+    POWER_ACTION        PowerAction;
+    NTSTATUS            status;
+
+    StackLocation = IoGetCurrentIrpStackLocation(Irp);
+    DeviceState = StackLocation->Parameters.Power.State.DeviceState;
+    PowerAction = StackLocation->Parameters.Power.ShutdownType;
+
+    Trace("====> (%s:%s)\n",
+        PowerDeviceStateName(DeviceState),
+        PowerActionName(PowerAction));
+
+    ASSERT3U(PowerAction, <, PowerActionShutdown);
+
+    if (DeviceState == __FdoGetDevicePowerState(Fdo)) {
+        IoSkipCurrentIrpStackLocation(Irp);
+        status = IoCallDriver(Fdo->LowerDeviceObject, Irp);
+
+        goto done;
+    }
+
+    status = (DeviceState < __FdoGetDevicePowerState(Fdo)) ?
+        __FdoSetDevicePowerUp(Fdo, Irp) :
+        __FdoSetDevicePowerDown(Fdo, Irp);
+
+done:
+    Trace("<==== (%s:%s)(%08x)\n",
+        PowerDeviceStateName(DeviceState),
+        PowerActionName(PowerAction),
+        status);
+    return status;
+}
+
+static NTSTATUS
+FdoDevicePower(
+    IN  PXENHID_THREAD  Self,
+    IN  PVOID           Context
+)
+{
+    PXENHID_FDO         Fdo = (PXENHID_FDO)Context;
+    PKEVENT             Event;
+
+    Event = ThreadGetEvent(Self);
+
+    for (;;) {
+        PIRP                Irp;
+        PIO_STACK_LOCATION  StackLocation;
+        UCHAR               MinorFunction;
+
+        if (Fdo->DevicePowerIrp == NULL) {
+            (VOID)KeWaitForSingleObject(Event,
+                Executive,
+                KernelMode,
+                FALSE,
+                NULL);
+            KeClearEvent(Event);
+        }
+
+        if (ThreadIsAlerted(Self))
+            break;
+
+        Irp = Fdo->DevicePowerIrp;
+
+        if (Irp == NULL)
+            continue;
+
+        Fdo->DevicePowerIrp = NULL;
+        KeMemoryBarrier();
+
+        StackLocation = IoGetCurrentIrpStackLocation(Irp);
+        MinorFunction = StackLocation->MinorFunction;
+
+        switch (StackLocation->MinorFunction) {
+        case IRP_MN_SET_POWER:
+            (VOID)__FdoSetDevicePower(Fdo, Irp);
+            break;
+
+        default:
+            ASSERT(FALSE);
+            break;
+        }
+    }
+
+    return STATUS_SUCCESS;
+}
+
+static DECLSPEC_NOINLINE NTSTATUS
+FdoDispatchPower(
+    IN  PXENHID_FDO     Fdo,
+    IN  PIRP            Irp
+)
+{
+    PIO_STACK_LOCATION  StackLocation;
+    UCHAR               MinorFunction;
+    POWER_STATE_TYPE    PowerType;
+    POWER_ACTION        PowerAction;
+    NTSTATUS            status;
+
+    StackLocation = IoGetCurrentIrpStackLocation(Irp);
+    MinorFunction = StackLocation->MinorFunction;
+
+    if (MinorFunction != IRP_MN_SET_POWER) {
+        IoSkipCurrentIrpStackLocation(Irp);
+        status = IoCallDriver(Fdo->LowerDeviceObject, Irp);
+
+        goto done;
+    }
+
+    PowerType = StackLocation->Parameters.Power.Type;
+    PowerAction = StackLocation->Parameters.Power.ShutdownType;
+
+    if (PowerAction >= PowerActionShutdown) {
+        IoSkipCurrentIrpStackLocation(Irp);
+        status = IoCallDriver(Fdo->LowerDeviceObject, Irp);
+
+        goto done;
+    }
+
+    switch (PowerType) {
+    case DevicePowerState:
+        IoMarkIrpPending(Irp);
+
+        ASSERT3P(Fdo->DevicePowerIrp, ==, NULL);
+        Fdo->DevicePowerIrp = Irp;
+        KeMemoryBarrier();
+
+        ThreadWake(Fdo->DevicePowerThread);
+
+        status = STATUS_PENDING;
+        break;
+
+    case SystemPowerState:
+    default:
+        IoSkipCurrentIrpStackLocation(Irp);
+        status = IoCallDriver(Fdo->LowerDeviceObject, Irp);
+        break;
+    }
+
+done:
+    return status;
+}
+
 static DECLSPEC_NOINLINE NTSTATUS
 FdoDispatchInternal(
     IN  PXENHID_FDO Fdo,
@@ -1031,6 +1274,10 @@ FdoDispatch(
         status = FdoDispatchPnp(Fdo, Irp);
         break;
 
+    case IRP_MJ_POWER:
+        status = FdoDispatchPower(Fdo, Irp);
+        break;
+
     default:
         status = FdoDispatchDefault(Fdo, Irp);
         break;
@@ -1118,6 +1365,11 @@ FdoCreate(
 
     Fdo->DeviceObject = DeviceObject;
     Fdo->LowerDeviceObject = LowerDeviceObject;
+    Fdo->DevicePowerState = PowerDeviceD3;
+
+    status = ThreadCreate(FdoDevicePower, Fdo, &Fdo->DevicePowerThread);
+    if (!NT_SUCCESS(status))
+        goto fail1;
 
     InitializeListHead(&Fdo->List);
     KeInitializeSpinLock(&Fdo->Lock);
@@ -1130,7 +1382,7 @@ FdoCreate(
                              FdoCsqReleaseLock,
                              FdoCsqCompleteCanceledIrp);
     if (!NT_SUCCESS(status))
-        goto fail1;
+        goto fail2;
 
     status = FdoQueryInterface(Fdo,
                                &GUID_XENBUS_SUSPEND_INTERFACE,
@@ -1138,7 +1390,7 @@ FdoCreate(
                                (PINTERFACE)&Fdo->SuspendInterface,
                                sizeof(XENBUS_SUSPEND_INTERFACE));
     if (!NT_SUCCESS(status))
-        goto fail2;
+        goto fail3;
 
     status = FdoQueryInterface(Fdo,
                                &GUID_XENBUS_STORE_INTERFACE,
@@ -1146,7 +1398,7 @@ FdoCreate(
                                (PINTERFACE)&Fdo->StoreInterface,
                                sizeof(XENBUS_STORE_INTERFACE));
     if (!NT_SUCCESS(status))
-        goto fail3;
+        goto fail4;
 
     status = FdoQueryInterface(Fdo,
                                &GUID_XENHID_HID_INTERFACE,
@@ -1154,33 +1406,40 @@ FdoCreate(
                                (PINTERFACE)&Fdo->HidInterface,
                                sizeof(XENHID_HID_INTERFACE));
     if (!NT_SUCCESS(status))
-        goto fail4;
+        goto fail5;
 
     Trace("<=====\n");
     return STATUS_SUCCESS;
 
-fail4:
-    Error("fail4\n");
+fail5:
+    Error("fail5\n");
 
     RtlZeroMemory(&Fdo->StoreInterface,
                   sizeof(XENBUS_STORE_INTERFACE));
 
-fail3:
-    Error("fail3\n");
+fail4:
+    Error("fail4\n");
 
     RtlZeroMemory(&Fdo->SuspendInterface,
                   sizeof(XENBUS_SUSPEND_INTERFACE));
 
-fail2:
-    Error("fail2\n");
+fail3:
+    Error("fail3\n");
 
     RtlZeroMemory(&Fdo->Queue, sizeof(IO_CSQ));
 
-fail1:
-    Error("fail1 %08x\n", status);
+fail2:
+    Error("fail2 %08x\n", status);
+
+    ThreadAlert(Fdo->DevicePowerThread);
+    ThreadJoin(Fdo->DevicePowerThread);
+    Fdo->DevicePowerThread = NULL;
 
     RtlZeroMemory(&Fdo->List, sizeof(LIST_ENTRY));
     RtlZeroMemory(&Fdo->Lock, sizeof(KSPIN_LOCK));
+
+fail1:
+    Error("fail1 %08x\n", status);
 
     Fdo->DeviceObject = NULL;
     Fdo->LowerDeviceObject = NULL;
@@ -1202,6 +1461,13 @@ FdoDestroy(
                   sizeof(XENBUS_SUSPEND_INTERFACE));
     RtlZeroMemory(&Fdo->StoreInterface,
                   sizeof(XENBUS_STORE_INTERFACE));
+
+    ThreadAlert(Fdo->DevicePowerThread);
+    ThreadJoin(Fdo->DevicePowerThread);
+    Fdo->DevicePowerThread = NULL;
+    Fdo->DevicePowerIrp = NULL;
+    Fdo->DevicePowerState = 0;
+
     RtlZeroMemory(&Fdo->Queue, sizeof(IO_CSQ));
     RtlZeroMemory(&Fdo->List, sizeof(LIST_ENTRY));
     RtlZeroMemory(&Fdo->Lock, sizeof(KSPIN_LOCK));

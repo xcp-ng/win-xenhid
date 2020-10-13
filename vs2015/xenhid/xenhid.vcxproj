@@ -53,6 +53,7 @@
   <ItemGroup>
     <ClCompile Include="../../src/xenhid/driver.c" />
     <ClCompile Include="../../src/xenhid/fdo.c" />
+    <ClCompile Include="../../src/xenhid/thread.c" />
     <ClCompile Include="../../src/xenhid/string.c" />
   </ItemGroup>
   <ItemGroup>
