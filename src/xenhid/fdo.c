@@ -123,8 +123,12 @@ FdoCsqPeekNextIrp(
     else
         ListEntry = Irp->Tail.Overlay.ListEntry.Flink;
 
-    NextIrp = CONTAINING_RECORD(ListEntry, IRP, Tail.Overlay.ListEntry);
     // should walk through the list until a match against Context is found
+    if (ListEntry != &Fdo->List)
+        NextIrp = CONTAINING_RECORD(ListEntry, IRP, Tail.Overlay.ListEntry);
+    else
+        NextIrp = NULL;
+
     return NextIrp;
 }
 
