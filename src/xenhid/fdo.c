@@ -214,7 +214,7 @@ __FdoAllocate(
 {
     PVOID       Buffer;
 
-    Buffer = ExAllocatePoolWithTag(NonPagedPool, Length, FDO_POOL_TAG);
+    Buffer = __AllocatePoolWithTag(NonPagedPool, Length, FDO_POOL_TAG);
     if (Buffer)
         RtlZeroMemory(Buffer, Length);
 
@@ -226,7 +226,7 @@ __FdoFree(
     IN  PVOID   Buffer
     )
 {
-    ExFreePoolWithTag(Buffer, FDO_POOL_TAG);
+    __FreePoolWithTag(Buffer, FDO_POOL_TAG);
 }
 
 static FORCEINLINE VOID
