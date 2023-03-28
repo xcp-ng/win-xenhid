@@ -58,5 +58,8 @@
   <ItemGroup>
     <None Include="..\..\src\coinst\xenhid_coinst.def" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\src\coinst\xenhid_coinst.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
