@@ -38,20 +38,16 @@ Provider=%Vendor%
 CatalogFile=xenhid.cat
 DriverVer=@INF_DATE@,@MAJOR_VERSION@.@MINOR_VERSION@.@MICRO_VERSION@.@BUILD_NUMBER@
 DriverPackageDisplayName=%DiskDesc%
+PnpLockdown=1
 
 [DestinationDirs] 
 DefaultDestDir=12 
-CoInst_CopyFiles=11
 
 [SourceDisksNames]
 0=%DiskDesc%
 
 [SourceDisksFiles]
 xenhid.sys=0,,
-xenhid_coinst.dll=0,,
-
-[CoInst_CopyFiles]
-xenhid_coinst_@MAJOR_VERSION@_@MINOR_VERSION@_@MICRO_VERSION@_@BUILD_NUMBER@.dll,xenhid_coinst.dll
 
 [Manufacturer] 
 %Vendor%=Inst,NT@INF_ARCH@
@@ -84,13 +80,6 @@ AddReg = XenHid_Parameters
 [XenHid_Parameters]
 HKR,"Parameters",,0x00000010
 HKR,"Parameters","RequestKey",0x00000000,%RequestKey%
-
-[XenHid_Inst.CoInstallers]
-CopyFiles=CoInst_CopyFiles
-AddReg=CoInst_AddReg
-
-[CoInst_AddReg]
-HKR,,CoInstallers32,0x00010000,"xenhid_coinst_@MAJOR_VERSION@_@MINOR_VERSION@_@MICRO_VERSION@_@BUILD_NUMBER@.dll,Entry"
 
 [Strings] 
 
