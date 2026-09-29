@@ -249,7 +249,7 @@ __FdoGetDevicePowerState(
 
 static FORCEINLINE PANSI_STRING
 __FdoMultiSzToUpcaseAnsi(
-    _In_ PCHAR      Buffer
+    _Inout_ PCHAR   Buffer
 )
 {
     PANSI_STRING    Ansi;
