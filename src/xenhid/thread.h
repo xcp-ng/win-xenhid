@@ -39,37 +39,37 @@ typedef struct _XENHID_THREAD XENHID_THREAD, *PXENHID_THREAD;
 
 typedef NTSTATUS (*XENHID_THREAD_FUNCTION)(PXENHID_THREAD, PVOID);
 
-__drv_requiresIRQL(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 extern NTSTATUS
 ThreadCreate(
-    IN  XENHID_THREAD_FUNCTION  Function,
-    IN  PVOID                   Context,
-    OUT PXENHID_THREAD          *Thread
+    _In_ XENHID_THREAD_FUNCTION Function,
+    _In_ PVOID                  Context,
+    _Outptr_ PXENHID_THREAD     *Thread
     );
 
 extern PKEVENT
 ThreadGetEvent(
-    IN  PXENHID_THREAD  Self
+    _In_ PXENHID_THREAD Self
     );
 
 extern BOOLEAN
 ThreadIsAlerted(
-    IN  PXENHID_THREAD  Self
+    _In_ PXENHID_THREAD Self
     );
 
 extern VOID
 ThreadWake(
-    IN  PXENHID_THREAD  Thread
+    _In_ PXENHID_THREAD Thread
     );
 
 extern VOID
 ThreadAlert(
-    IN  PXENHID_THREAD  Thread
+    _In_ PXENHID_THREAD Thread
     );
 
 extern VOID
 ThreadJoin(
-    IN  PXENHID_THREAD  Thread
+    _In_ PXENHID_THREAD Thread
     );
 
 #endif  // _XENHID_THREAD_H

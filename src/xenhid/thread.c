@@ -50,7 +50,7 @@ struct _XENHID_THREAD {
 
 static FORCEINLINE PVOID
 __ThreadAllocate(
-    IN  ULONG   Length
+    _In_ ULONG  Length
     )
 {
     return __AllocatePoolWithTag(NonPagedPool, Length, THREAD_POOL);
@@ -58,7 +58,7 @@ __ThreadAllocate(
 
 static FORCEINLINE VOID
 __ThreadFree(
-    IN  PVOID   Buffer
+    _In_ PVOID  Buffer
     )
 {
     __FreePoolWithTag(Buffer, THREAD_POOL);
@@ -66,7 +66,7 @@ __ThreadFree(
 
 static FORCEINLINE VOID
 __ThreadWake(
-    IN  PXENHID_THREAD  Thread
+    _In_ PXENHID_THREAD Thread
     )
 {
     KeSetEvent(&Thread->Event, IO_NO_INCREMENT, FALSE);
@@ -74,7 +74,7 @@ __ThreadWake(
 
 VOID
 ThreadWake(
-    IN  PXENHID_THREAD  Thread
+    _In_ PXENHID_THREAD Thread
     )
 {
     __ThreadWake(Thread);
@@ -82,7 +82,7 @@ ThreadWake(
 
 static FORCEINLINE VOID
 __ThreadAlert(
-    IN  PXENHID_THREAD  Thread
+    _In_ PXENHID_THREAD Thread
     )
 {
     Thread->Alerted = TRUE;
@@ -91,7 +91,7 @@ __ThreadAlert(
 
 VOID
 ThreadAlert(
-    IN  PXENHID_THREAD  Thread
+    _In_ PXENHID_THREAD Thread
     )
 {
     __ThreadAlert(Thread);
@@ -101,7 +101,7 @@ KSTART_ROUTINE  ThreadFunction;
 
 VOID
 ThreadFunction(
-    IN  PVOID       Argument
+    _In_ PVOID      Argument
     )
 {
     PXENHID_THREAD  Self = Argument;
@@ -116,12 +116,12 @@ ThreadFunction(
     // NOT REACHED
 }
 
-__drv_requiresIRQL(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS
 ThreadCreate(
-    IN  XENHID_THREAD_FUNCTION  Function,
-    IN  PVOID                   Context,
-    OUT PXENHID_THREAD          *Thread
+    _In_ XENHID_THREAD_FUNCTION Function,
+    _In_ PVOID                  Context,
+    _Outptr_ PXENHID_THREAD     *Thread
     )
 {
     HANDLE                      Handle;
@@ -191,7 +191,7 @@ fail1:
 
 PKEVENT
 ThreadGetEvent(
-    IN  PXENHID_THREAD  Thread
+    _In_ PXENHID_THREAD Thread
     )
 {
     return &Thread->Event;
@@ -199,7 +199,7 @@ ThreadGetEvent(
 
 BOOLEAN
 ThreadIsAlerted(
-    IN  PXENHID_THREAD  Thread
+    _In_ PXENHID_THREAD Thread
     )
 {
     return Thread->Alerted;
@@ -207,7 +207,7 @@ ThreadIsAlerted(
 
 VOID
 ThreadJoin(
-    IN  PXENHID_THREAD  Thread
+    _In_ PXENHID_THREAD Thread
     )
 {
     LONG                References;

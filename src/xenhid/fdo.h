@@ -42,20 +42,20 @@ FdoGetSize(
 
 extern NTSTATUS
 FdoDispatch(
-    IN  PXENHID_FDO Fdo,
-    IN  PIRP        Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
     );
 
 extern NTSTATUS
 FdoCreate(
-    IN  PXENHID_FDO     Fdo,
-    IN  PDEVICE_OBJECT  DeviceObject,
-    IN  PDEVICE_OBJECT  LowerDeviceObject
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PDEVICE_OBJECT DeviceObject,
+    _In_ PDEVICE_OBJECT LowerDeviceObject
     );
 
 extern VOID
 FdoDestroy(
-    IN  PXENHID_FDO Fdo
+    _In_ PXENHID_FDO    Fdo
     );
 
 #endif  // _XENHID_FDO_H

@@ -39,11 +39,11 @@
 
 static FORCEINLINE VOID
 __Bug(
-    IN  ULONG       Code,
-    IN  ULONG_PTR   Parameter1,
-    IN  ULONG_PTR   Parameter2,
-    IN  ULONG_PTR   Parameter3,
-    IN  ULONG_PTR   Parameter4
+    _In_ ULONG      Code,
+    _In_ ULONG_PTR  Parameter1,
+    _In_ ULONG_PTR  Parameter2,
+    _In_ ULONG_PTR  Parameter3,
+    _In_ ULONG_PTR  Parameter4
     )
 {
 #pragma prefast(suppress:28159)
@@ -154,13 +154,13 @@ __Bug(
 
 static __inline BOOLEAN
 _IsZeroMemory(
-    IN  const PCHAR Caller,
-    IN  const PCHAR Name,
-    IN  PVOID       Buffer,
-    IN  ULONG       Length
+    _In_ const PCHAR    Caller,
+    _In_ const PCHAR    Name,
+    _In_ PVOID          Buffer,
+    _In_ ULONG          Length
     )
 {
-    ULONG           Offset;
+    ULONG               Offset;
 
     Offset = 0;
     while (Offset < Length) {
@@ -178,10 +178,10 @@ _IsZeroMemory(
 
 static __inline BOOLEAN
 _IsZeroMemory(
-    IN  const PCHAR Caller,
-    IN  const PCHAR Name,
-    IN  PVOID       Buffer,
-    IN  ULONG       Length
+    _In_ const PCHAR    Caller,
+    _In_ const PCHAR    Name,
+    _In_ PVOID          Buffer,
+    _In_ ULONG          Length
     )
 {
     UNREFERENCED_PARAMETER(Caller);

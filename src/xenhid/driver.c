@@ -51,7 +51,7 @@ static XENHID_DRIVER    Driver;
 
 static FORCEINLINE VOID
 __DriverSetDriverObject(
-    IN  PDRIVER_OBJECT  DriverObject
+    _In_ PDRIVER_OBJECT DriverObject
     )
 {
     Driver.DriverObject = DriverObject;
@@ -77,7 +77,7 @@ DRIVER_UNLOAD       DriverUnload;
 
 VOID
 DriverUnload(
-    IN  PDRIVER_OBJECT  DriverObject
+    _In_ PDRIVER_OBJECT DriverObject
     )
 {
     ASSERT3P(DriverObject, ==, __DriverGetDriverObject());
@@ -104,8 +104,8 @@ DRIVER_ADD_DEVICE   AddDevice;
 
 NTSTATUS
 AddDevice(
-    IN  PDRIVER_OBJECT  DriverObject,
-    IN  PDEVICE_OBJECT  DeviceObject
+    _In_ PDRIVER_OBJECT     DriverObject,
+    _In_ PDEVICE_OBJECT     DeviceObject
     )
 {
     PHID_DEVICE_EXTENSION   Hid;
@@ -137,8 +137,8 @@ DRIVER_DISPATCH Dispatch;
 
 NTSTATUS 
 Dispatch(
-    IN PDEVICE_OBJECT   DeviceObject,
-    IN PIRP             Irp
+    _In_ PDEVICE_OBJECT     DeviceObject,
+    _In_ PIRP               Irp
     )
 {
     PHID_DEVICE_EXTENSION   Hid;
@@ -157,8 +157,8 @@ DRIVER_INITIALIZE   DriverEntry;
 
 NTSTATUS
 DriverEntry(
-    IN  PDRIVER_OBJECT          DriverObject,
-    IN  PUNICODE_STRING         RegistryPath
+    _In_ PDRIVER_OBJECT         DriverObject,
+    _In_ PUNICODE_STRING        RegistryPath
     )
 {
     HID_MINIDRIVER_REGISTRATION Minidriver;
@@ -188,8 +188,8 @@ DriverEntry(
     DriverObject->DriverExtension->AddDevice = AddDevice;
 
     for (Index = 0; Index <= IRP_MJ_MAXIMUM_FUNCTION; Index++) {
-#pragma prefast(suppress:28169) // No __drv_dispatchType annotation
-#pragma prefast(suppress:28168) // No matching __drv_dispatchType annotation for IRP_MJ_CREATE
+#pragma prefast(suppress:28169) // No _Dispatch_type_ annotation
+#pragma prefast(suppress:28168) // No matching _Dispatch_type_ annotation for IRP_MJ_CREATE
         DriverObject->MajorFunction[Index] = Dispatch;
     }
 
