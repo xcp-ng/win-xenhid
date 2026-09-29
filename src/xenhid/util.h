@@ -267,8 +267,8 @@ __FreePages(
 
 static FORCEINLINE PCHAR
 __strtok_r(
-    _Inout_ PCHAR   Buffer,
-    _In_ PCHAR      Delimiter,
+    _Inout_ PSTR    Buffer,
+    _In_ PSTR       Delimiter,
     _Inout_ PCHAR   *Context
     )
 {
@@ -305,8 +305,8 @@ __strtok_r(
 
 static FORCEINLINE PWCHAR
 __wcstok_r(
-    _Inout_ PWCHAR  Buffer,
-    _In_ PWCHAR     Delimiter,
+    _Inout_ PWSTR   Buffer,
+    _In_ PWSTR      Delimiter,
     _Inout_ PWCHAR  *Context
     )
 {

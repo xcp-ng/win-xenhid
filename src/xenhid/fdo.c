@@ -249,7 +249,7 @@ __FdoGetDevicePowerState(
 
 static FORCEINLINE PANSI_STRING
 __FdoMultiSzToUpcaseAnsi(
-    _Inout_ PCHAR   Buffer
+    _Inout_ PSTR    Buffer
 )
 {
     PANSI_STRING    Ansi;
@@ -329,7 +329,7 @@ __FdoFreeAnsi(
 static FORCEINLINE BOOLEAN
 __FdoMatchDistribution(
     _In_ PXENHID_FDO    Fdo,
-    _In_ PCHAR          Buffer
+    _In_ PSTR           Buffer
 )
 {
     PCHAR               Vendor;
