@@ -82,11 +82,11 @@ IO_CSQ_INSERT_IRP FdoCsqInsertIrp;
 
 VOID
 FdoCsqInsertIrp(
-    IN  PIO_CSQ Csq,
-    IN  PIRP    Irp
+    _In_ PIO_CSQ    Csq,
+    _In_ PIRP       Irp
     )
 {
-    PXENHID_FDO Fdo = CONTAINING_RECORD(Csq, XENHID_FDO, Queue);
+    PXENHID_FDO     Fdo = CONTAINING_RECORD(Csq, XENHID_FDO, Queue);
 
     InsertTailList(&Fdo->List, &Irp->Tail.Overlay.ListEntry);
 }
@@ -95,8 +95,8 @@ IO_CSQ_REMOVE_IRP FdoCsqRemoveIrp;
 
 VOID
 FdoCsqRemoveIrp(
-    IN  PIO_CSQ Csq,
-    IN  PIRP    Irp
+    _In_ PIO_CSQ    Csq,
+    _In_ PIRP       Irp
     )
 {
     UNREFERENCED_PARAMETER(Csq);
@@ -108,14 +108,14 @@ IO_CSQ_PEEK_NEXT_IRP FdoCsqPeekNextIrp;
 
 PIRP
 FdoCsqPeekNextIrp(
-    IN  PIO_CSQ Csq,
-    IN  PIRP    Irp,
-    IN  PVOID   Context
+    _In_ PIO_CSQ    Csq,
+    _In_ PIRP       Irp,
+    _In_ PVOID      Context
     )
 {
-    PXENHID_FDO Fdo = CONTAINING_RECORD(Csq, XENHID_FDO, Queue);
-    PLIST_ENTRY ListEntry;
-    PIRP        NextIrp;
+    PXENHID_FDO     Fdo = CONTAINING_RECORD(Csq, XENHID_FDO, Queue);
+    PLIST_ENTRY     ListEntry;
+    PIRP            NextIrp;
 
     UNREFERENCED_PARAMETER(Context);
 
@@ -140,11 +140,11 @@ IO_CSQ_ACQUIRE_LOCK FdoCsqAcquireLock;
 
 VOID
 FdoCsqAcquireLock(
-    IN  PIO_CSQ Csq,
-    OUT PKIRQL  Irql
+    _In_ PIO_CSQ    Csq,
+    _Out_ PKIRQL    Irql
     )
 {
-    PXENHID_FDO Fdo = CONTAINING_RECORD(Csq, XENHID_FDO, Queue);
+    PXENHID_FDO     Fdo = CONTAINING_RECORD(Csq, XENHID_FDO, Queue);
 
     KeAcquireSpinLock(&Fdo->Lock, Irql);
 }
@@ -153,11 +153,11 @@ IO_CSQ_RELEASE_LOCK FdoCsqReleaseLock;
 
 VOID
 FdoCsqReleaseLock(
-    IN  PIO_CSQ Csq,
-    IN  KIRQL   Irql
+    _In_ PIO_CSQ    Csq,
+    _In_ KIRQL      Irql
     )
 {
-    PXENHID_FDO Fdo = CONTAINING_RECORD(Csq, XENHID_FDO, Queue);
+    PXENHID_FDO     Fdo = CONTAINING_RECORD(Csq, XENHID_FDO, Queue);
 
     KeReleaseSpinLock(&Fdo->Lock, Irql);
 }
@@ -168,8 +168,8 @@ IO_CSQ_COMPLETE_CANCELED_IRP FdoCsqCompleteCanceledIrp;
 
 VOID
 FdoCsqCompleteCanceledIrp(
-    IN  PIO_CSQ Csq,
-    IN  PIRP    Irp
+    _In_ PIO_CSQ    Csq,
+    _In_ PIRP       Irp
     )
 {
     UNREFERENCED_PARAMETER(Csq);
@@ -181,9 +181,9 @@ FdoCsqCompleteCanceledIrp(
 
 static DECLSPEC_NOINLINE BOOLEAN
 FdoHidCallback(
-    IN  PVOID       Argument,
-    IN  PVOID       Buffer,
-    IN  ULONG       Length
+    _In_ PVOID      Argument,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length
     )
 {
     PXENHID_FDO     Fdo = Argument;
@@ -210,7 +210,7 @@ done:
 
 static FORCEINLINE PVOID
 __FdoAllocate(
-    IN  ULONG   Length
+    _In_ ULONG  Length
     )
 {
     PVOID       Buffer;
@@ -224,7 +224,7 @@ __FdoAllocate(
 
 static FORCEINLINE VOID
 __FdoFree(
-    IN  PVOID   Buffer
+    _In_ PVOID  Buffer
     )
 {
     __FreePoolWithTag(Buffer, FDO_POOL_TAG);
@@ -232,8 +232,8 @@ __FdoFree(
 
 static FORCEINLINE VOID
 __FdoSetDevicePowerState(
-    IN  PXENHID_FDO         Fdo,
-    IN  DEVICE_POWER_STATE  State
+    _In_ PXENHID_FDO        Fdo,
+    _In_ DEVICE_POWER_STATE State
 )
 {
     Fdo->DevicePowerState = State;
@@ -241,7 +241,7 @@ __FdoSetDevicePowerState(
 
 static FORCEINLINE DEVICE_POWER_STATE
 __FdoGetDevicePowerState(
-    IN  PXENHID_FDO     Fdo
+    _In_ PXENHID_FDO    Fdo
 )
 {
     return Fdo->DevicePowerState;
@@ -249,7 +249,7 @@ __FdoGetDevicePowerState(
 
 static FORCEINLINE PANSI_STRING
 __FdoMultiSzToUpcaseAnsi(
-    IN  PCHAR       Buffer
+    _In_ PCHAR      Buffer
 )
 {
     PANSI_STRING    Ansi;
@@ -315,7 +315,7 @@ fail1:
 
 static FORCEINLINE VOID
 __FdoFreeAnsi(
-    IN  PANSI_STRING    Ansi
+    _In_ PANSI_STRING   Ansi
     )
 {
     ULONG               Index;
@@ -328,8 +328,8 @@ __FdoFreeAnsi(
 
 static FORCEINLINE BOOLEAN
 __FdoMatchDistribution(
-    IN  PXENHID_FDO     Fdo,
-    IN  PCHAR           Buffer
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PCHAR          Buffer
 )
 {
     PCHAR               Vendor;
@@ -390,7 +390,7 @@ fail1:
 
 static FORCEINLINE NTSTATUS
 __FdoSetDistribution(
-    IN  PXENHID_FDO     Fdo
+    _In_ PXENHID_FDO    Fdo
     )
 {
     ULONG               Index;
@@ -491,7 +491,7 @@ fail1:
 
 static FORCEINLINE VOID
 __FdoClearDistribution(
-    IN  PXENHID_FDO     Fdo
+    _In_ PXENHID_FDO    Fdo
     )
 {
     PCHAR               Buffer;
@@ -552,7 +552,7 @@ done:
 
 static DECLSPEC_NOINLINE VOID
 FdoSuspendCallback(
-    IN  PVOID       Argument
+    _In_ PVOID      Argument
     )
 {
     PXENHID_FDO     Fdo = Argument;
@@ -562,7 +562,7 @@ FdoSuspendCallback(
 
 static DECLSPEC_NOINLINE NTSTATUS
 FdoSetDistribution(
-    IN  PXENHID_FDO Fdo
+    _In_ PXENHID_FDO    Fdo
     )
 {
     NTSTATUS            status;
@@ -593,7 +593,7 @@ fail1:
 
 static DECLSPEC_NOINLINE VOID
 FdoClearDistribution(
-    IN  PXENHID_FDO Fdo
+    _In_ PXENHID_FDO    Fdo
     )
 {
     Trace("====>\n");
@@ -610,10 +610,10 @@ FdoClearDistribution(
 
 static DECLSPEC_NOINLINE NTSTATUS
 FdoD3ToD0(
-    IN  PXENHID_FDO Fdo
+    _In_ PXENHID_FDO    Fdo
     )
 {
-    NTSTATUS        status;
+    NTSTATUS            status;
 
     ASSERT3U(__FdoGetDevicePowerState(Fdo), ==, PowerDeviceD3);
 
@@ -684,7 +684,7 @@ fail1:
 
 static DECLSPEC_NOINLINE VOID
 FdoD0ToD3(
-    IN  PXENHID_FDO Fdo
+    _In_ PXENHID_FDO    Fdo
     )
 {
     Trace("=====>\n");
@@ -715,11 +715,11 @@ done:
 
 static DECLSPEC_NOINLINE NTSTATUS
 FdoDispatchDefault(
-    IN  PXENHID_FDO Fdo,
-    IN  PIRP        Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
     )
 {
-    NTSTATUS        status;
+    NTSTATUS            status;
 
     IoSkipCurrentIrpStackLocation(Irp);
     status = IoCallDriver(Fdo->LowerDeviceObject, Irp);
@@ -727,13 +727,13 @@ FdoDispatchDefault(
     return status;
 }
 
-__drv_functionClass(IO_COMPLETION_ROUTINE)
-__drv_sameIRQL
+_Function_class_(IO_COMPLETION_ROUTINE)
+_IRQL_requires_same_
 static NTSTATUS
 __FdoForwardIrpSynchronously(
-    IN  PDEVICE_OBJECT  DeviceObject,
-    IN  PIRP            Irp,
-    IN  PVOID           Context
+    _In_ PDEVICE_OBJECT DeviceObject,
+    _In_ PIRP           Irp,
+    _In_ PVOID          Context
     )
 {
     PKEVENT             Event = Context;
@@ -748,8 +748,8 @@ __FdoForwardIrpSynchronously(
 
 static NTSTATUS
 FdoForwardIrpSynchronously(
-    IN  PXENHID_FDO     Fdo,
-    IN  PIRP            Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
     )
 {
     KEVENT              Event;
@@ -786,8 +786,8 @@ FdoForwardIrpSynchronously(
 
 static DECLSPEC_NOINLINE NTSTATUS
 FdoStartDevice(
-    IN  PXENHID_FDO     Fdo,
-    IN  PIRP            Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
     )
 {
     NTSTATUS            status;
@@ -819,11 +819,11 @@ fail1:
 
 static DECLSPEC_NOINLINE NTSTATUS
 FdoStopDevice(
-    IN  PXENHID_FDO Fdo,
-    IN  PIRP        Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
     )
 {
-    NTSTATUS        status;
+    NTSTATUS            status;
 
     FdoD0ToD3(Fdo);
 
@@ -837,11 +837,11 @@ FdoStopDevice(
 
 static DECLSPEC_NOINLINE NTSTATUS
 FdoRemoveDevice(
-    IN  PXENHID_FDO Fdo,
-    IN  PIRP        Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
     )
 {
-    NTSTATUS        status;
+    NTSTATUS            status;
 
     ASSERT3U(KeGetCurrentIrql(), ==, PASSIVE_LEVEL);
 
@@ -859,8 +859,8 @@ FdoRemoveDevice(
 
 static DECLSPEC_NOINLINE NTSTATUS
 FdoDispatchPnp(
-    IN  PXENHID_FDO Fdo,
-    IN  PIRP        Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
     )
 {
     PIO_STACK_LOCATION  StackLocation;
@@ -902,8 +902,8 @@ FdoDispatchPnp(
 
 static FORCEINLINE NTSTATUS
 __FdoSetDevicePowerUp(
-    IN  PXENHID_FDO     Fdo,
-    IN  PIRP            Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
 )
 {
     PIO_STACK_LOCATION  StackLocation;
@@ -939,8 +939,8 @@ done:
 
 static FORCEINLINE NTSTATUS
 __FdoSetDevicePowerDown(
-    IN  PXENHID_FDO     Fdo,
-    IN  PIRP            Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
 )
 {
     PIO_STACK_LOCATION  StackLocation;
@@ -969,8 +969,8 @@ __FdoSetDevicePowerDown(
 
 static FORCEINLINE NTSTATUS
 __FdoSetDevicePower(
-    IN  PXENHID_FDO     Fdo,
-    IN  PIRP            Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
 )
 {
     PIO_STACK_LOCATION  StackLocation;
@@ -1009,8 +1009,8 @@ done:
 
 static NTSTATUS
 FdoDevicePower(
-    IN  PXENHID_THREAD  Self,
-    IN  PVOID           Context
+    _In_ PXENHID_THREAD Self,
+    _In_ PVOID          Context
 )
 {
     PXENHID_FDO         Fdo = (PXENHID_FDO)Context;
@@ -1062,8 +1062,8 @@ FdoDevicePower(
 
 static DECLSPEC_NOINLINE NTSTATUS
 FdoDispatchPower(
-    IN  PXENHID_FDO     Fdo,
-    IN  PIRP            Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
 )
 {
     PIO_STACK_LOCATION  StackLocation;
@@ -1118,8 +1118,8 @@ done:
 
 static DECLSPEC_NOINLINE NTSTATUS
 FdoDispatchInternal(
-    IN  PXENHID_FDO Fdo,
-    IN  PIRP        Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
     )
 {
     PIO_STACK_LOCATION  StackLocation;
@@ -1262,8 +1262,8 @@ FdoDispatchInternal(
 
 NTSTATUS
 FdoDispatch(
-    IN  PXENHID_FDO Fdo,
-    IN  PIRP        Irp
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PIRP           Irp
     )
 {
     PIO_STACK_LOCATION  StackLocation;
@@ -1293,11 +1293,11 @@ FdoDispatch(
 
 static FORCEINLINE NTSTATUS
 FdoQueryInterface(
-    IN  PXENHID_FDO     Fdo,
-    IN  const GUID      *Guid,
-    IN  ULONG           Version,
-    OUT PINTERFACE      Interface,
-    IN  ULONG           Size
+    _In_ PXENHID_FDO    Fdo,
+    _In_ const GUID     *Guid,
+    _In_ ULONG          Version,
+    _Out_ PINTERFACE    Interface,
+    _In_ ULONG          Size
     )
 {
     KEVENT              Event;
@@ -1359,9 +1359,9 @@ fail1:
 
 NTSTATUS
 FdoCreate(
-    IN  PXENHID_FDO     Fdo,
-    IN  PDEVICE_OBJECT  DeviceObject,
-    IN  PDEVICE_OBJECT  LowerDeviceObject
+    _In_ PXENHID_FDO    Fdo,
+    _In_ PDEVICE_OBJECT DeviceObject,
+    _In_ PDEVICE_OBJECT LowerDeviceObject
     )
 {
     NTSTATUS            status;
@@ -1455,7 +1455,7 @@ fail1:
 
 VOID
 FdoDestroy(
-    IN  PXENHID_FDO Fdo
+    _In_ PXENHID_FDO    Fdo
     )
 {
     Trace("=====>\n");
