@@ -51,7 +51,7 @@ static XENHID_DRIVER    Driver;
 
 static FORCEINLINE VOID
 __DriverSetDriverObject(
-    _In_ PDRIVER_OBJECT DriverObject
+    _In_opt_ PDRIVER_OBJECT DriverObject
     )
 {
     Driver.DriverObject = DriverObject;
@@ -138,7 +138,7 @@ DRIVER_DISPATCH Dispatch;
 NTSTATUS 
 Dispatch(
     _In_ PDEVICE_OBJECT     DeviceObject,
-    _In_ PIRP               Irp
+    _Inout_ PIRP            Irp
     )
 {
     PHID_DEVICE_EXTENSION   Hid;
