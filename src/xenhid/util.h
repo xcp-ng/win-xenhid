@@ -108,12 +108,12 @@ __CpuId(
 
 static FORCEINLINE LONG
 __InterlockedAdd(
-    _In_ LONG   *Value,
-    _In_ LONG   Delta
+    _Inout_ LONG    *Value,
+    _In_ LONG       Delta
     )
 {
-    LONG        New;
-    LONG        Old;
+    LONG            New;
+    LONG            Old;
 
     do {
         Old = *Value;
@@ -125,12 +125,12 @@ __InterlockedAdd(
 
 static FORCEINLINE LONG
 __InterlockedSubtract(
-    _In_ LONG   *Value,
-    _In_ LONG   Delta
+    _Inout_ LONG    *Value,
+    _In_ LONG       Delta
     )
 {
-    LONG        New;
-    LONG        Old;
+    LONG            New;
+    LONG            Old;
 
     do {
         Old = *Value;
@@ -267,7 +267,7 @@ __FreePages(
 
 static FORCEINLINE PCHAR
 __strtok_r(
-    _In_ PCHAR      Buffer,
+    _Inout_ PCHAR   Buffer,
     _In_ PCHAR      Delimiter,
     _Inout_ PCHAR   *Context
     )
@@ -305,7 +305,7 @@ __strtok_r(
 
 static FORCEINLINE PWCHAR
 __wcstok_r(
-    _In_ PWCHAR     Buffer,
+    _Inout_ PWCHAR  Buffer,
     _In_ PWCHAR     Delimiter,
     _Inout_ PWCHAR  *Context
     )
