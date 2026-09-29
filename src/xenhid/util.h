@@ -38,8 +38,8 @@
 
 #include "assert.h"
 
-#define	P2ROUNDUP(_x, _a)   \
-        (-(-(_x) & -(_a)))
+#define	P2ROUNDUP(_t, _x, _a)   \
+        (-(-((_t)(_x)) & -(((_t)(_a)))))
 
 static FORCEINLINE LONG
 __ffs(
@@ -108,12 +108,12 @@ __CpuId(
 
 static FORCEINLINE LONG
 __InterlockedAdd(
-    _Inout_ LONG    *Value,
-    _In_ LONG       Delta
+    _In_ LONG   *Value,
+    _In_ LONG   Delta
     )
 {
-    LONG            New;
-    LONG            Old;
+    LONG        New;
+    LONG        Old;
 
     do {
         Old = *Value;
@@ -125,12 +125,12 @@ __InterlockedAdd(
 
 static FORCEINLINE LONG
 __InterlockedSubtract(
-    _Inout_ LONG    *Value,
-    _In_ LONG       Delta
+    _In_ LONG   *Value,
+    _In_ LONG   Delta
     )
 {
-    LONG            New;
-    LONG            Old;
+    LONG        New;
+    LONG        Old;
 
     do {
         Old = *Value;
@@ -150,13 +150,14 @@ __AllocatePoolWithTag(
 {
     PUCHAR          Buffer;
 
-    __analysis_assume(PoolType == NonPagedPool ||
+    _Analysis_assume_(PoolType == NonPagedPool ||
                       PoolType == PagedPool);
 
     if (NumberOfBytes == 0)
         return NULL;
 
 #if (_MSC_VER >= 1928) // VS 16.9 (EWDK 20344 or later)
+#pragma warning(suppress:28160) // annotation error
     Buffer = ExAllocatePoolUninitialized(PoolType, NumberOfBytes, Tag);
 #else
 #pragma warning(suppress:28160) // annotation error
@@ -180,28 +181,37 @@ __FreePoolWithTag(
 
 static FORCEINLINE PMDL
 __AllocatePages(
-    _In_ ULONG          Count
+    _In_ ULONG          Count,
+    _In_ BOOLEAN        Contiguous
     )
 {
     PHYSICAL_ADDRESS    LowAddress;
     PHYSICAL_ADDRESS    HighAddress;
     LARGE_INTEGER       SkipBytes;
     SIZE_T              TotalBytes;
+    ULONG               Flags;
     PMDL                Mdl;
     PUCHAR              MdlMappedSystemVa;
     NTSTATUS            status;
 
     LowAddress.QuadPart = 0ull;
     HighAddress.QuadPart = ~0ull;
-    SkipBytes.QuadPart = 0ull;
     TotalBytes = (SIZE_T)PAGE_SIZE * Count;
+
+    if (Contiguous) {
+        SkipBytes.QuadPart = TotalBytes;
+        Flags = MM_ALLOCATE_REQUIRE_CONTIGUOUS_CHUNKS;
+    } else {
+        SkipBytes.QuadPart = 0ull;
+        Flags = MM_ALLOCATE_FULLY_REQUIRED;
+    }
 
     Mdl = MmAllocatePagesForMdlEx(LowAddress,
                                   HighAddress,
                                   SkipBytes,
                                   TotalBytes,
                                   MmCached,
-                                  MM_ALLOCATE_FULLY_REQUIRED);
+                                  Flags);
 
     status = STATUS_NO_MEMORY;
     if (Mdl == NULL)
@@ -245,7 +255,7 @@ fail1:
     return NULL;
 }
 
-#define __AllocatePage()    __AllocatePages(1)
+#define __AllocatePage()    __AllocatePages(1, FALSE)
 
 static FORCEINLINE VOID
 __FreePages(
@@ -265,15 +275,17 @@ __FreePages(
 
 #define __FreePage(_Mdl)    __FreePages(_Mdl)
 
-static FORCEINLINE PCHAR
+static FORCEINLINE PSTR
 __strtok_r(
-    _Inout_ PSTR    Buffer,
+    _In_opt_ PSTR   Buffer,
     _In_ PSTR       Delimiter,
-    _Inout_ PCHAR   *Context
+    _When_(Buffer != NULL, _Outptr_)
+    _When_(Buffer == NULL, _Inout_)
+    PSTR            *Context
     )
 {
-    PCHAR           Token;
-    PCHAR           End;
+    PSTR            Token;
+    PSTR            End;
 
     if (Buffer != NULL)
         *Context = Buffer;
@@ -303,15 +315,17 @@ __strtok_r(
     return Token;
 }
 
-static FORCEINLINE PWCHAR
+static FORCEINLINE PWSTR
 __wcstok_r(
-    _Inout_ PWSTR   Buffer,
+    _In_opt_ PWSTR  Buffer,
     _In_ PWSTR      Delimiter,
-    _Inout_ PWCHAR  *Context
+    _When_(Buffer != NULL, _Outptr_)
+    _When_(Buffer == NULL, _Inout_)
+    PWSTR           *Context
     )
 {
-    PWCHAR          Token;
-    PWCHAR          End;
+    PWSTR           Token;
+    PWSTR           End;
 
     if (Buffer != NULL)
         *Context = Buffer;
