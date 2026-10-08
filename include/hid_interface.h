@@ -48,7 +48,7 @@
 */  
 typedef NTSTATUS
 (*XENHID_HID_ACQUIRE)(
-    IN  PINTERFACE  Interface
+    _In_ PINTERFACE Interface
     );
 
 /*! \typedef XENHID_HID_RELEASE
@@ -58,7 +58,7 @@ typedef NTSTATUS
 */  
 typedef VOID
 (*XENHID_HID_RELEASE)(
-    IN  PINTERFACE  Interface
+    _In_ PINTERFACE Interface
     );
 
 /*! \typedef XENHID_HID_CALLBACK
@@ -70,9 +70,9 @@ typedef VOID
 */
 typedef BOOLEAN
 (*XENHID_HID_CALLBACK)(
-    IN  PVOID       Argument OPTIONAL,
-    IN  PVOID       Buffer,
-    IN  ULONG       Length
+    _In_opt_ PVOID  Argument,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length
     );
 
 /*! \typedef XENHID_HID_ENABLE
@@ -87,9 +87,9 @@ typedef BOOLEAN
 */
 typedef NTSTATUS
 (*XENHID_HID_ENABLE)(
-    IN  PINTERFACE          Interface,
-    IN  XENHID_HID_CALLBACK Callback,
-    IN  PVOID               Argument OPTIONAL
+    _In_ PINTERFACE             Interface,
+    _In_ XENHID_HID_CALLBACK    Callback,
+    _In_opt_ PVOID              Argument
     );
 
 /*! \typedef XENHID_HID_DISABLE
@@ -102,7 +102,7 @@ typedef NTSTATUS
 */
 typedef VOID
 (*XENHID_HID_DISABLE)(
-    IN  PINTERFACE  Interface
+    _In_ PINTERFACE Interface
     );
 
 /*! \typedef XENHID_HID_GET_DEVICE_ATTRIBUTES
@@ -111,10 +111,10 @@ typedef VOID
 */
 typedef NTSTATUS
 (*XENHID_HID_GET_DEVICE_ATTRIBUTES)(
-    IN  PINTERFACE      Interface,
-    IN  PVOID           Buffer,
-    IN  ULONG           Length,
-    OUT PULONG          Returned
+    _In_ PINTERFACE Interface,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length,
+    _Out_ PULONG    Returned
     );
 
 /*! \typedef XENHID_HID_GET_DEVICE_DESCRIPTOR
@@ -127,10 +127,10 @@ typedef NTSTATUS
 */
 typedef NTSTATUS
 (*XENHID_HID_GET_DEVICE_DESCRIPTOR)(
-    IN  PINTERFACE      Interface,
-    IN  PVOID           Buffer,
-    IN  ULONG           Length,
-    OUT PULONG          Returned
+    _In_ PINTERFACE Interface,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length,
+    _Out_ PULONG    Returned
     );
 
 /*! \typedef XENHID_HID_GET_REPORT_DESCRIPTOR
@@ -143,10 +143,10 @@ typedef NTSTATUS
 */
 typedef NTSTATUS
 (*XENHID_HID_GET_REPORT_DESCRIPTOR)(
-    IN  PINTERFACE      Interface,
-    IN  PVOID           Buffer,
-    IN  ULONG           Length,
-    OUT PULONG          Returned
+    _In_ PINTERFACE Interface,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length,
+    _Out_ PULONG    Returned
     );
 
 /*! \typedef XENHID_HID_GET_STRING
@@ -160,11 +160,11 @@ typedef NTSTATUS
 */
 typedef NTSTATUS
 (*XENHID_HID_GET_STRING)(
-    IN  PINTERFACE      Interface,
-    IN  ULONG           Identifier,
-    IN  PVOID           Buffer,
-    IN  ULONG           Length,
-    OUT PULONG          Returned
+    _In_ PINTERFACE Interface,
+    _In_ ULONG      Identifier,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length,
+    _Out_ PULONG    Returned
     );
 
 /*! \typedef XENHID_HID_GET_INDEXED_STRING
@@ -178,11 +178,11 @@ typedef NTSTATUS
 */
 typedef NTSTATUS
 (*XENHID_HID_GET_INDEXED_STRING)(
-    IN  PINTERFACE      Interface,
-    IN  ULONG           Index,
-    IN  PVOID           Buffer,
-    IN  ULONG           Length,
-    OUT PULONG          Returned
+    _In_ PINTERFACE Interface,
+    _In_ ULONG      Index,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length,
+    _Out_ PULONG    Returned
     );
 
 /*! \typedef XENHID_HID_GET_FEATURE
@@ -196,11 +196,11 @@ typedef NTSTATUS
 */
 typedef NTSTATUS
 (*XENHID_HID_GET_FEATURE)(
-    IN  PINTERFACE      Interface,
-    IN  ULONG           ReportId,
-    IN  PVOID           Buffer,
-    IN  ULONG           Length,
-    OUT PULONG          Returned
+    _In_ PINTERFACE Interface,
+    _In_ ULONG      ReportId,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length,
+    _Out_ PULONG    Returned
     );
 
 /*! \typedef XENHID_HID_SET_FEATURE
@@ -213,10 +213,10 @@ typedef NTSTATUS
 */
 typedef NTSTATUS
 (*XENHID_HID_SET_FEATURE)(
-    IN  PINTERFACE      Interface,
-    IN  ULONG           ReportId,
-    IN  PVOID           Buffer,
-    IN  ULONG           Length
+    _In_ PINTERFACE Interface,
+    _In_ ULONG      ReportId,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length
     );
 
 /*! \typedef XENHID_HID_GET_INPUT_REPORT
@@ -230,11 +230,11 @@ typedef NTSTATUS
 */
 typedef NTSTATUS
 (*XENHID_HID_GET_INPUT_REPORT)(
-    IN  PINTERFACE      Interface,
-    IN  ULONG           ReportId,
-    IN  PVOID           Buffer,
-    IN  ULONG           Length,
-    OUT PULONG          Returned
+    _In_ PINTERFACE Interface,
+    _In_ ULONG      ReportId,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length,
+    _Out_ PULONG    Returned
     );
 
 /*! \typedef XENHID_HID_SET_OUTPUT_REPORT
@@ -247,10 +247,10 @@ typedef NTSTATUS
 */
 typedef NTSTATUS
 (*XENHID_HID_SET_OUTPUT_REPORT)(
-    IN  PINTERFACE      Interface,
-    IN  ULONG           ReportId,
-    IN  PVOID           Buffer,
-    IN  ULONG           Length
+    _In_ PINTERFACE Interface,
+    _In_ ULONG      ReportId,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length
     );
 
 /*! \typedef XENHID_HID_READ_REPORT
@@ -262,7 +262,7 @@ typedef NTSTATUS
 */
 typedef VOID
 (*XENHID_HID_READ_REPORT)(
-    IN  PINTERFACE      Interface
+    _In_ PINTERFACE Interface
     );
 
 /*! \typedef XENHID_HID_WRITE_REPORT
@@ -275,10 +275,10 @@ typedef VOID
 */
 typedef NTSTATUS
 (*XENHID_HID_WRITE_REPORT)(
-    IN  PINTERFACE      Interface,
-    IN  ULONG           ReportId,
-    IN  PVOID           Buffer,
-    IN  ULONG           Length
+    _In_ PINTERFACE Interface,
+    _In_ ULONG      ReportId,
+    _In_ PVOID      Buffer,
+    _In_ ULONG      Length
     );
 
 // {D215E1B5-8C38-420A-AEA6-02520DF3A621}
