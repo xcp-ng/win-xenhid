@@ -30,8 +30,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _XENHID_UTIL_H
-#define _XENHID_UTIL_H
+#ifndef _COMMON_UTIL_H
+#define _COMMON_UTIL_H
 
 #include <ntddk.h>
 #include <intrin.h>
@@ -40,6 +40,11 @@
 
 #define	P2ROUNDUP(_t, _x, _a)   \
         (-(-((_t)(_x)) & -(((_t)(_a)))))
+
+#define TIME_US(_us)            ((_us) * 10ll)
+#define TIME_MS(_ms)            (TIME_US((_ms) * 1000ll))
+#define TIME_S(_s)              (TIME_MS((_s) * 1000ll))
+#define TIME_RELATIVE(_t)       (-(_t))
 
 static FORCEINLINE LONG
 __ffs(
@@ -89,7 +94,7 @@ __CpuId(
     _Out_opt_ PULONG    EDX
     )
 {
-    int                 Value[4] = {0};
+    int         Value[4] = {0};
 
     __cpuid(Value, Leaf);
 
@@ -196,13 +201,12 @@ __AllocatePages(
 
     LowAddress.QuadPart = 0ull;
     HighAddress.QuadPart = ~0ull;
+    SkipBytes.QuadPart = 0ull;
     TotalBytes = (SIZE_T)PAGE_SIZE * Count;
 
     if (Contiguous) {
-        SkipBytes.QuadPart = TotalBytes;
         Flags = MM_ALLOCATE_REQUIRE_CONTIGUOUS_CHUNKS;
     } else {
-        SkipBytes.QuadPart = 0ull;
         Flags = MM_ALLOCATE_FULLY_REQUIRED;
     }
 
@@ -262,7 +266,7 @@ __FreePages(
     _In_ PMDL   Mdl
     )
 {
-    PUCHAR      MdlMappedSystemVa;
+    PUCHAR	MdlMappedSystemVa;
 
     ASSERT(Mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA);
     MdlMappedSystemVa = Mdl->MappedSystemVa;
@@ -377,4 +381,4 @@ __tolower(
     return 'a' + Character - 'A';
 }
 
-#endif  // _XENHID_UTIL_H
+#endif  // _COMMON_UTIL_H
